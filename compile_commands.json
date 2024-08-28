@@ -1,0 +1,12 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/g++",
+      "-c",
+      "-I./proto",
+      "main.cpp"
+    ],
+    "directory": "/home/lukeisun/Projects/deadlock",
+    "file": "/home/lukeisun/Projects/deadlock/main.cpp"
+  }
+]
