@@ -1,4 +1,7 @@
+#include "proto/citadel_clientmessages.pb.h"
+#include "proto/citadel_usermessages.pb.h"
 #include "proto/demo.pb.h"
+#include "proto/netmessages.pb.h"
 #include <bitset>
 #include <cstdint>
 #include <cstdlib>
@@ -11,6 +14,7 @@
 #include <google/protobuf/stubs/common.h>
 #include <ios>
 #include <limits>
+#include <ostream>
 #include <sstream>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -37,19 +41,19 @@ public:
     this->bits = bits;
     this->curr_pos = 0;
   }
-  uint32_t read_n_bits(int n) {
+  uint64_t read_n_bits(int n) {
     int new_pos = n + this->curr_pos;
-    if (new_pos >= bits.size()) {
-      std::cerr << "OOB\n";
+    if (new_pos > bits.size()) {
+      return 0;
     }
-    auto res = this->to_number(new_pos);
+    auto res = this->to_number(n);
     this->curr_pos = new_pos;
     return res;
   }
-  uint32_t to_number(int new_pos) {
-    uint32_t result = 0;
-    for (int i = this->curr_pos; i <= new_pos; i++) {
-      result |= (this->bits[i] ? 1 : 0) << i;
+  uint64_t to_number(int n) {
+    uint64_t result = 0;
+    for (int i = 0; i < n; i++) {
+      result |= (this->bits[i + this->curr_pos] ? 1 : 0) << i;
     }
     return result;
   }
@@ -57,8 +61,8 @@ public:
     int32_t value = 0;
     int shift = 0;
     uint8_t byte;
-    if (this->curr_pos % 8 == 0)
-      this->curr_pos += (this->curr_pos % 8);
+    // if (this->curr_pos % 8 == 0)
+    //   this->curr_pos += (this->curr_pos % 8);
     do {
       byte = this->read_n_bits(8);
       value |= (byte & 0x7f) << shift;
@@ -66,6 +70,14 @@ public:
     } while ((byte & 0x80) != 0);
     return value;
   }
+  std::vector<uint8_t> read(int n) {
+    std::vector<uint8_t> data(n);
+    for (int i = 0; i < n; i++) {
+      data[i] = this->read_n_bits(8);
+    }
+    return data;
+  }
+
   bool out_of_bounds() { return this->curr_pos > bits.size(); }
   ~Bits() = default;
 };
@@ -135,8 +147,32 @@ int main(void) {
         } else if (flag == 48) {
           temp = (temp & 15) | (bits->read_n_bits(28) << 4);
         }
+        if (temp == 0)
+          break;
         ubit = temp;
         auto size = bits->readVarInt32();
+        auto buf = bits->read(size);
+
+        // if (!SVC_Messages_IsValid(ubit)) {
+        //     std::cerr << "Not valid svc_message enum value " << ubit <<
+        //     std::endl; exit(EXIT_FAILURE);
+        //   }
+        switch (ubit) {
+        case 4: {
+          CNETMsg_Tick tick;
+          tick.ParseFromArray(buf.data(), size);
+          tick.PrintDebugString();
+          break;
+        }
+        case 55: {
+          CSVCMsg_PacketEntities entities;
+          entities.ParseFromArray(buf.data(), size);
+          entities.PrintDebugString();
+          break;
+        }
+        default:
+          break;
+        }
         std::cout << "Ubit: " << ubit << " Size: " << size << std::endl;
       }
       delete bits;
