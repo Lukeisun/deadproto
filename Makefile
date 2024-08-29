@@ -2,10 +2,10 @@
 CXX = g++
 
 # Compiler flags
-CXXFLAGS = -std=c++17 -I./proto
-
+# -fsanitize=address
+CXXFLAGS = -std=c++17 -I./proto  -g
 # Linker flags
-LDFLAGS = -L/usr/lib -lprotobuf -labsl_log_internal_check_op -labsl_log_internal_message
+LDFLAGS = -L/usr/lib  -lprotobuf -g -labsl_log_internal_check_op -labsl_log_internal_message -lsnappy
 
 # Source files
 SRCS = main.cpp \
