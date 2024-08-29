@@ -1,16 +1,1 @@
-[
-  {
-    "arguments": [
-      "/usr/bin/g++",
-      "-std=c++17",
-      "-I./proto",
-      "-c",
-      "-o",
-      "main.o",
-      "main.cpp"
-    ],
-    "directory": "/home/lukeisun/Projects/deadlock",
-    "file": "/home/lukeisun/Projects/deadlock/main.cpp",
-    "output": "/home/lukeisun/Projects/deadlock/main.o"
-  }
-]
+[]

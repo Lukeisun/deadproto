@@ -1,7 +1,7 @@
-#include "proto/citadel_clientmessages.pb.h"
-#include "proto/citadel_usermessages.pb.h"
-#include "proto/demo.pb.h"
-#include "proto/netmessages.pb.h"
+#include "gen/citadel_clientmessages.pb.h"
+#include "gen/citadel_usermessages.pb.h"
+#include "gen/demo.pb.h"
+#include "gen/netmessages.pb.h"
 #include <bitset>
 #include <cstdint>
 #include <cstdlib>
@@ -97,24 +97,21 @@ int main(void) {
   uint32_t kind, tick, frame_size;
   // const char *text = "/***********************/\n"
   //                    "*    FRAME INFO         *";
-  std::unordered_map<int, int> map;
-  while (input->BytesUntilTotalBytesLimit() != 0 && frame_size != UINT32_MAX) {
+  std::unordered_map<int, int> kind_map;
+  std::unordered_map<int, int> ubit_map;
+  while (input->BytesUntilTotalBytesLimit() != 0) {
     input->ReadVarint32(&kind);
     input->ReadVarint32(&tick);
     input->ReadVarint32(&frame_size);
-    map[kind] += 1;
+    kind_map[kind] += 1;
     int32_t msg_type = kind & ~EDemoCommands::DEM_IsCompressed;
     bool is_compressed = (kind & EDemoCommands::DEM_IsCompressed) ==
                          EDemoCommands::DEM_IsCompressed;
     if (UINT32_MAX == tick)
       tick = 0;
-    // std::cout << text << std::endl;
     std::cout << "Kind: " << kind << " Tick: " << tick
               << " Frame Size: " << frame_size << " Compressed? "
               << is_compressed << std::endl;
-    // std::cout << input->BytesUntilTotalBytesLimit() << " " << UINT32_MAX << "
-    // "
-    //           << file_info.st_size << std::endl;
 
     auto buf = new char[frame_size];
     if (!input->ReadRaw(buf, frame_size)) {
@@ -157,6 +154,7 @@ int main(void) {
         //     std::cerr << "Not valid svc_message enum value " << ubit <<
         //     std::endl; exit(EXIT_FAILURE);
         //   }
+        // cnet or csvc
         switch (ubit) {
         case 4: {
           CNETMsg_Tick tick;
@@ -173,6 +171,7 @@ int main(void) {
         default:
           break;
         }
+          ubit_map[ubit] += 1;
         std::cout << "Ubit: " << ubit << " Size: " << size << std::endl;
       }
       delete bits;
@@ -185,7 +184,10 @@ int main(void) {
     }
     delete[] buf;
   }
-  for (auto it = map.cbegin(); it != map.cend(); ++it) {
+  for (auto it = kind_map.cbegin(); it != kind_map.cend(); ++it) {
     std::cout << "Kind: " << it->first << " Count: " << it->second << "\n";
+  }
+  for (auto it = ubit_map.cbegin(); it != ubit_map.cend(); ++it) {
+    std::cout << "Ubit: " << it->first << " Count: " << it->second << "\n";
   }
 }
