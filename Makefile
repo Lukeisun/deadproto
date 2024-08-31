@@ -3,9 +3,9 @@ CXX = g++
 
 # Compiler flags
 # -fsanitize=address
-CXXFLAGS = -std=c++17 -I./proto  -g
+CXXFLAGS = -std=c++17 -I./proto  
 # Linker flags
-LDFLAGS = -L/usr/lib  -lprotobuf -g -labsl_log_internal_check_op -labsl_log_internal_message -lsnappy
+LDFLAGS = -L/usr/lib  -lprotobuf  -labsl_log_internal_check_op -labsl_log_internal_message -lsnappy
 
 # Source files
 SRCS = main.cpp \
@@ -16,7 +16,7 @@ OBJS = $(SRCS:.cpp=.o)
 OBJS := $(OBJS:.cc=.o)
 
 # Executable name
-TARGET = myprogram
+TARGET = lash
 
 # Default target
 all: $(TARGET)
