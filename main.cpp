@@ -6,6 +6,7 @@
 #include "snappy.h"
 #include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <fcntl.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream.h>
@@ -13,6 +14,7 @@
 #include <google/protobuf/parse_context.h>
 #include <google/protobuf/stubs/common.h>
 #include <ostream>
+#include <stdexcept>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unordered_map>
@@ -28,40 +30,53 @@ std::unordered_map<int, int> ubit_map;
 
 void handle_packet(std::string data) {
   Bits *bits = new Bits(data);
+  uint64_t temp;
+  uint64_t ubit;
+  int32_t size;
+  std::vector<uint8_t> buf;
   while (!bits->out_of_bounds()) {
-    uint64_t ubit;
-    uint64_t temp = bits->read_n_bits(6);
-    auto flag = temp & 0x30;
-    if (flag == 16) {
-      temp = (temp & 15) | (bits->read_n_bits(4) << 4);
-    } else if (flag == 32) {
-      temp = (temp & 15) | (bits->read_n_bits(8) << 4);
-    } else if (flag == 48) {
-      temp = (temp & 15) | (bits->read_n_bits(28) << 4);
-    }
-    if (temp == 0)
+    try {
+      temp = bits->read_n_bits(6);
+      auto flag = temp & 0x30;
+      if (flag == 16) {
+        temp = (temp & 15) | (bits->read_n_bits(4) << 4);
+      } else if (flag == 32) {
+        temp = (temp & 15) | (bits->read_n_bits(8) << 4);
+      } else if (flag == 48) {
+        temp = (temp & 15) | (bits->read_n_bits(28) << 4);
+      }
+      ubit = temp;
+      size = bits->readVarInt32();
+      buf = bits->read(size);
+    } catch (std::out_of_range e) {
+      // std::cerr << e.what() << std::endl;
       break;
-    ubit = temp;
-    auto size = bits->readVarInt32();
-    auto buf = bits->read(size);
-
+    }
     switch (ubit) {
-    case 4: {
-      CNETMsg_Tick tick;
-      tick.ParseFromArray(buf.data(), size);
-      // tick.PrintDebugString();
-      break;
-    }
-    case 55: {
-      CSVCMsg_PacketEntities entities;
-      entities.ParseFromArray(buf.data(), size);
-      entities.PrintDebugString();
-      break;
-    }
-    default:
-      std::cout << "Unknown Ubit" << std::endl;
-      std::cout << "Ubit: " << ubit << " Size: " << size << std::endl;
-      break;
+      case 4: {
+        CNETMsg_Tick tick;
+        tick.ParseFromArray(buf.data(), size);
+        // tick.PrintDebugString();
+        break;
+      }
+      case 55: {
+        CSVCMsg_PacketEntities entities;
+        entities.ParseFromArray(buf.data(), size);
+        // entities.PrintDebugString();
+        break;
+      }
+      case k_EUserMsg_ChatMsg: {
+        CCitadelUserMsg_ChatMsg chat_msg;
+        std::cout << "Chat Msg: " << std::endl;
+        char *cbuf = reinterpret_cast<char *>(buf.data());
+        chat_msg.ParseFromString(std::string(cbuf));
+        chat_msg.PrintDebugString();
+        break;
+      }
+      default:
+        // std::cout << "Unknown Ubit" << std::endl;
+        // std::cout << "Ubit: " << ubit << " Size: " << size << std::endl;
+        break;
     }
     ubit_map[ubit] += 1;
   }
@@ -95,9 +110,9 @@ int main(void) {
 
     if (UINT32_MAX == tick)
       tick = 0;
-    std::cout << "Kind: " << kind << " Tick: " << tick
-              << " Frame Size: " << frame_size << " Compressed? "
-              << is_compressed << std::endl;
+    // std::cout << "Kind: " << kind << " Tick: " << tick
+    //           << " Frame Size: " << frame_size << " Compressed? "
+    //           << is_compressed << std::endl;
 
     std::vector<uint8_t> buf(frame_size);
     if (!input->ReadRaw(buf.data(), frame_size)) {
@@ -107,8 +122,8 @@ int main(void) {
 
     if (is_compressed) {
       size_t res;
-      auto x = snappy::GetUncompressedLength(reinterpret_cast<const char *>(buf.data()), buf.size(),
-                                          &res);
+      auto x = snappy::GetUncompressedLength(
+          reinterpret_cast<const char *>(buf.data()), buf.size(), &res);
       std::vector<uint8_t> uncompressed(res);
       snappy::RawUncompress(reinterpret_cast<const char *>(buf.data()),
                             buf.size(),
@@ -129,11 +144,13 @@ int main(void) {
       packet.ParseFromArray(buf.data(), buf.size());
       auto data = packet.data();
       handle_packet(data);
+      break;
     }
     case 71: {
-      CSVCMsg_ServerInfo server_info;
-      server_info.ParseFromArray(buf.data(), buf.size());
-      // server_info.PrintDebugString();
+      CDemoPacket packet;
+      packet.ParseFromArray(buf.data(), buf.size());
+      auto data = packet.data();
+      handle_packet(data);
       break;
     }
 
