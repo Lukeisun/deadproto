@@ -9,6 +9,7 @@ class Bits {
 private:
   std::vector<bool> bits;
   int curr_pos;
+
 public:
   Bits(std::string data) {
     std::vector<bool> bits;
@@ -51,6 +52,19 @@ public:
     } while ((byte & 0x80) != 0);
     return value;
   }
+  uint64_t read_ubit() {
+    auto res = this->read_n_bits(6);
+    auto flag = res & 0x30;
+    if (flag == 16) {
+      res = (res & 15) | (this->read_n_bits(4) << 4);
+    } else if (flag == 32) {
+      res = (res & 15) | (this->read_n_bits(8) << 4);
+    } else if (flag == 48) {
+      res = (res & 15) | (this->read_n_bits(28) << 4);
+    }
+    return res;
+  }
+  bool read_boolean() { return this->read_n_bits(1) == 1; }
   std::vector<uint8_t> read(int n) {
     std::vector<uint8_t> data(n);
     for (int i = 0; i < n; i++) {
