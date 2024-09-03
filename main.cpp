@@ -31,75 +31,74 @@ using namespace google::protobuf::io;
 std::unordered_map<int, int> ubit_map;
 
 void handle_packet(std::string data) {
-  // Bits *bits = new Bits(data);
+  Bits *bits = new Bits(data.data(), data.size());
   uint64_t temp;
   uint64_t ubit;
   int32_t size;
   std::vector<uint8_t> buf;
-  // while (!bits->out_of_bounds()) {
-  //   try {
-  //     ubit = bits->read_ubit();
-  //     size = bits->readVarInt32();
-  //     buf = bits->read(size);
-  //   } catch (std::out_of_range e) {
-  //     break;
-  //   }
-  //   switch (ubit) {
-  //   // case NET_Messages::net_Tick: {
-  //   //   CNETMsg_Tick tick;
-  //   //   tick.ParseFromArray(buf.data(), size);
-  //   //   // tick.PrintDebugString();
-  //   //   break;
-  //   // }
-  //   case svc_PacketEntities: {
-  //     CSVCMsg_PacketEntities entities;
-  //     // entities.ParseFromArray(buf.data(), size);
-  //     // entities.PrintDebugString();
-  //     break;
-  //   }
-  //   case svc_CreateStringTable: {
-  //     CSVCMsg_CreateStringTable table;
-  //     std::cout << table.GetTypeName() << std::endl;
-  //     table.ParseFromArray(buf.data(), size);
-  //     // s
-  //     if (table.name() == "userinfo") {
-  //       auto s_data = table.string_data();
-  //       std::string res;
-  //       snappy::Uncompress(s_data.data(), s_data.size(), &res);
-  //       assert(res.size() == table.uncompressed_size());
-  //       // Bits *st_bits = new Bits(res.data());
-  //       for (auto i = 0; i < table.num_entries(); i++) {
-  //       }
-  //
-  //       // table.PrintDebugString();
-  //       // CMsgPlayerInfo player;
-  //       // player.ParseFromArray(res.data(), res.size());
-  //       // player.PrintDebugString();
-  //     }
-  //     break;
-  //   }
-  //   case k_EUserMsg_ChatMsg: {
-  //     CCitadelUserMsg_ChatMsg chat_msg;
-  //     std::cout << "Chat Msg: " << std::endl;
-  //     chat_msg.ParseFromArray(buf.data(), size);
-  //     // chat_msg.PrintDebugString();
-  //     break;
-  //   }
-  //     // case k_eViewedSettings_ChatWheel: {
-  //     //   // CCitadelUserMsg_ChatWheel chat_wheel;
-  //     //   // std::cout << chat_wheel.GetTypeName() << std::endl;
-  //     //   // chat_wheel.ParseFromArray(buf.data(), size);
-  //     //   // chat_wheel.PrintDebugString();
-  //     //   // break;
-  //     // }
-  //   default:
-  //     // std::cout << "Unknown Ubit" << std::endl;
-  //     // std::cout << "Ubit: " << ubit << " Size: " << size << std::endl;
-  //     break;
-  //   }
-  //   ubit_map[ubit] += 1;
-  // }
-  // delete bits;
+  while (!bits->out_of_bounds()) {
+    try {
+      ubit = bits->read_ubit();
+      size = bits->readVarInt32();
+      buf = bits->read(size);
+    } catch (std::out_of_range e) {
+      break;
+    }
+    switch (ubit) {
+    // case NET_Messages::net_Tick: {
+    //   CNETMsg_Tick tick;
+    //   tick.ParseFromArray(buf.data(), size);
+    //   // tick.PrintDebugString();
+    //   break;
+    // }
+    case svc_PacketEntities: {
+      CSVCMsg_PacketEntities entities;
+      // entities.ParseFromArray(buf.data(), size);
+      // entities.PrintDebugString();
+      break;
+    }
+    case svc_CreateStringTable: {
+      CSVCMsg_CreateStringTable table;
+      std::cout << table.GetTypeName() << std::endl;
+      table.ParseFromArray(buf.data(), size);
+      if (table.name() == "userinfo") {
+        auto s_data = table.string_data();
+        std::string st_data;
+        snappy::Uncompress(s_data.data(), s_data.size(), &st_data);
+        assert(st_data.size() == table.uncompressed_size());
+        Bits *st_bits = new Bits(st_data.data(), st_data.size());
+        for (auto i = 0; i < table.num_entries(); i++) {
+        }
+        table.PrintDebugString();
+
+        // CMsgPlayerInfo player;
+        // player.ParseFromArray(res.data(), res.size());
+        // player.PrintDebugString();
+      }
+      break;
+    }
+    case k_EUserMsg_ChatMsg: {
+      CCitadelUserMsg_ChatMsg chat_msg;
+      std::cout << "Chat Msg: " << std::endl;
+      chat_msg.ParseFromArray(buf.data(), size);
+      // chat_msg.PrintDebugString();
+      break;
+    }
+      // case k_eViewedSettings_ChatWheel: {
+      //   // CCitadelUserMsg_ChatWheel chat_wheel;
+      //   // std::cout << chat_wheel.GetTypeName() << std::endl;
+      //   // chat_wheel.ParseFromArray(buf.data(), size);
+      //   // chat_wheel.PrintDebugString();
+      //   // break;
+      // }
+    default:
+      // std::cout << "Unknown Ubit" << std::endl;
+      // std::cout << "Ubit: " << ubit << " Size: " << size << std::endl;
+      break;
+    }
+    ubit_map[ubit] += 1;
+  }
+  delete bits;
 }
 
 int main(void) {
@@ -137,6 +136,7 @@ int main(void) {
       snappy::Uncompress(reinterpret_cast<char *>(buf.data()), frame_size,
                          &uncompress);
       std::memcpy(buf.data(), uncompress.data(), uncompress.size());
+      frame_size = uncompress.size();
       command = (command & ~64);
     }
     assert(EDemoCommands_IsValid(command));
@@ -155,7 +155,6 @@ int main(void) {
     case EDemoCommands::DEM_Packet: {
       CDemoPacket packet;
       // std::cout << packet.GetTypeName() << std::endl;
-      // std::cout << buf.data();
       packet.ParseFromArray(buf.data(), frame_size);
       auto data = packet.data();
       handle_packet(data);

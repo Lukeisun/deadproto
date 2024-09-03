@@ -1,45 +1,39 @@
+#include <cassert>
 #include <cstdint>
-#include <exception>
-#include <sstream>
 #include <stdexcept>
-#include <string>
 #include <vector>
 #pragma once
 class Bits {
 private:
-  std::vector<bool> bits;
-  int curr_pos;
+  char *bytes;
+  size_t bytes_len;
+  uint8_t bit_pos;
+  int byte_pos;
 
 public:
-  Bits(std::string data) {
-    std::vector<bool> bits;
-    bits.reserve(data.size() * 8); // Reserve space for efficiency
-    for (auto c : data) {
-      for (int i = 0; i < 8; i++) {
-        bits.push_back((c >> i) & 1);
-      }
-    }
-    this->bits = bits;
-    this->curr_pos = 0;
+  Bits(char *bytes, size_t bytes_len) {
+    this->bytes_len = bytes_len;
+    this->bytes = bytes;
+    this->byte_pos = 0;
+    this->bit_pos = 0;
   }
+  // TODO: get rid of exception >:(
   uint64_t read_n_bits(int n) {
-    int new_pos = n + this->curr_pos;
-    if (new_pos > bits.size()) {
-      std::ostringstream str;
-      str << "Went over by " << new_pos - bits.size() << " bits" << std::endl;
-      str << "\tTried to read " << n << " bits";
-      throw std::out_of_range(str.str());
+    uint64_t res = 0;
+    for (int i = 0; i < n; i += 1) {
+      if (this->out_of_bounds()) {
+        throw std::out_of_range("");
+      }
+      if ((this->bit_pos) >= 8) {
+        this->byte_pos++;
+        this->bit_pos = 0;
+      }
+      // get bit
+      res |= ((this->bytes[this->byte_pos] >> this->bit_pos) & 1) << i;
+      this->bit_pos += 1;
+      assert(!(bit_pos > 8));
     }
-    auto res = this->to_number(n);
-    this->curr_pos = new_pos;
     return res;
-  }
-  uint64_t to_number(int n) {
-    uint64_t result = 0;
-    for (int i = 0; i < n; i++) {
-      result |= (this->bits[i + this->curr_pos] ? 1 : 0) << i;
-    }
-    return result;
   }
   int32_t readVarInt32() {
     int32_t value = 0;
@@ -73,6 +67,6 @@ public:
     return data;
   }
 
-  bool out_of_bounds() { return this->curr_pos > bits.size(); }
+  bool out_of_bounds() { return this->byte_pos >= this->bytes_len; }
   ~Bits() = default;
 };
