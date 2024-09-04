@@ -9,6 +9,7 @@ private:
   size_t bytes_len;
   uint8_t bit_pos;
   int byte_pos;
+  static constexpr const uint32_t MAX_STR_LEN = 4082;
 
 public:
   Bits(char *bytes, size_t bytes_len) {
@@ -65,6 +66,15 @@ public:
       data[i] = this->read_n_bits(8);
     }
     return data;
+  }
+  std::string read_string() {
+    std::string str;
+    for (int i = 0; i < this->MAX_STR_LEN; i++) {
+      const char b = static_cast<char>(this->read_n_bits(8));
+      if (b == 0) break;
+      str.push_back(b);
+    }
+    return str;
   }
 
   bool out_of_bounds() { return this->byte_pos >= this->bytes_len; }

@@ -67,7 +67,27 @@ void handle_packet(std::string data) {
         snappy::Uncompress(s_data.data(), s_data.size(), &st_data);
         assert(st_data.size() == table.uncompressed_size());
         Bits *st_bits = new Bits(st_data.data(), st_data.size());
+        std::vector<std::string> keys{};
+        int index = -1;
         for (auto i = 0; i < table.num_entries(); i++) {
+          // Increment index
+          if (st_bits->read_boolean()) {
+            index++;
+          } else {
+            index += st_bits->readVarInt32() + 1;
+          }
+          // Has key?
+          if (st_bits->read_boolean()) {
+            // Look at history?
+            if (st_bits->read_boolean()) {
+              auto pos = st_bits->read_n_bits(5);
+              auto len = st_bits->read_n_bits(5);
+            } else {
+              // readstring
+              auto key = st_bits->read_string();
+              std::cout << "Key: " << key << std::endl;
+            }
+          }
         }
         table.PrintDebugString();
 
