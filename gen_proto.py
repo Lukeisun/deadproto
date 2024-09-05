@@ -28,7 +28,7 @@ def compile_protos(proto_dir, output_dir, protoc_path):
 
 if __name__ == "__main__":
     proto_dir = r"Deadlocked/Protobufs"
-    output_dir = r"./proto"
+    output_dir = r"./gen"
     protoc_path = r"protoc"
     
     # if not os.path.exists(protoc_path):

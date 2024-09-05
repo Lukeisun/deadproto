@@ -1,16 +1,12 @@
 #include "Bits.hpp"
-#include "gen/citadel_clientmessages.pb.h"
-#include "gen/citadel_gamemessages.pb.h"
-#include "gen/citadel_gcmessages_client.pb.h"
 #include "gen/citadel_usermessages.pb.h"
 #include "gen/demo.pb.h"
 #include "gen/netmessages.pb.h"
-#include "gen/networkbasetypes.pb.h"
 #include "snappy.h"
+#include "Demo.hpp"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <exception>
 #include <fcntl.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream.h>
@@ -36,7 +32,7 @@ void handle_packet(std::string data) {
   uint64_t ubit;
   int32_t size;
   std::vector<uint8_t> buf;
-  while (!bits->out_of_bounds()) {
+  while (true) {
     try {
       ubit = bits->read_ubit();
       size = bits->readVarInt32();
@@ -61,40 +57,46 @@ void handle_packet(std::string data) {
       CSVCMsg_CreateStringTable table;
       std::cout << table.GetTypeName() << std::endl;
       table.ParseFromArray(buf.data(), size);
-      if (table.name() == "userinfo") {
-        auto s_data = table.string_data();
-        std::string st_data;
-        snappy::Uncompress(s_data.data(), s_data.size(), &st_data);
-        assert(st_data.size() == table.uncompressed_size());
-        Bits *st_bits = new Bits(st_data.data(), st_data.size());
-        std::vector<std::string> keys{};
-        int index = -1;
-        for (auto i = 0; i < table.num_entries(); i++) {
-          // Increment index
-          if (st_bits->read_boolean()) {
-            index++;
-          } else {
-            index += st_bits->readVarInt32() + 1;
-          }
-          // Has key?
-          if (st_bits->read_boolean()) {
-            // Look at history?
-            if (st_bits->read_boolean()) {
-              auto pos = st_bits->read_n_bits(5);
-              auto len = st_bits->read_n_bits(5);
-            } else {
-              // readstring
-              auto key = st_bits->read_string();
-              std::cout << "Key: " << key << std::endl;
-            }
-          }
-        }
-        table.PrintDebugString();
+      // if (table.name() == "userinfo") {
+      // auto s_data = table.string_data();
+      // std::string st_data;
+      // snappy::Uncompress(s_data.data(), s_data.size(), &st_data);
+      // assert(st_data.size() == table.uncompressed_size());
+      // Bits *st_bits = new Bits(st_data.data(), st_data.size());
+      // std::vector<std::string> keys{};
+      // int index = -1;
+      // for (auto i = 0; i < table.num_entries(); i++) {
+      //   std::string key;
+      //   // Increment index
+      //   if (st_bits->read_boolean()) {
+      //     index++;
+      //   } else {
+      //     index += st_bits->readVarInt32() + 1;
+      //   }
+      //   // Has key?
+      //   if (st_bits->read_boolean()) {
+      //     // Look at history?
+      //     if (st_bits->read_boolean()) {
+      //       auto pos = st_bits->read_n_bits(5);
+      //       auto len = st_bits->read_n_bits(5);
+      //       if (pos >= keys.size()) {
+      //         key.append(st_bits->read_string());
+      //       } else {
+      //           auto s = keys[pos];
+      //       }
+      //     } else {
+      //       // readstring
+      //       auto key = st_bits->read_string();
+      //       // std::cout << "Key: " << key << std::endl;
+      //     }
+      //   }
+      // }
+      // table.PrintDebugString();
 
-        // CMsgPlayerInfo player;
-        // player.ParseFromArray(res.data(), res.size());
-        // player.PrintDebugString();
-      }
+      // CMsgPlayerInfo player;
+      // player.ParseFromArray(res.data(), res.size());
+      // player.PrintDebugString();
+      // }
       break;
     }
     case k_EUserMsg_ChatMsg: {
@@ -118,7 +120,7 @@ void handle_packet(std::string data) {
     }
     ubit_map[ubit] += 1;
   }
-  delete bits;
+  // delete bits;
 }
 
 int main(void) {
@@ -131,85 +133,86 @@ int main(void) {
   std::cout << file_info.st_size << std::endl;
   ZeroCopyInputStream *raw = new FileInputStream(fd);
   CodedInputStream *input = new CodedInputStream(raw);
-  input->SetTotalBytesLimit(file_info.st_size);
-  input->Skip(16);
-  uint32_t command, tick, frame_size;
-  std::unordered_map<int, int> kind_map;
-  std::array<uint8_t, 300'000> buf{};
-  int prev_size = 0;
-  while (input->BytesUntilTotalBytesLimit() != 0) {
-    input->ReadVarint32(&command);
-    input->ReadVarint32(&tick);
-    input->ReadVarint32(&frame_size);
-    if (!input->ReadRaw(buf.data(), frame_size)) {
-      std::cerr << "error reading to buffer" << std::endl;
-      exit(EXIT_FAILURE);
-    }
-    int32_t msg_type = command & ~EDemoCommands::DEM_IsCompressed;
-    bool is_compressed = (command & EDemoCommands::DEM_IsCompressed) ==
-                         EDemoCommands::DEM_IsCompressed;
-    // std::cout << tick << std::endl;
-    if (UINT32_MAX == tick)
-      tick = 0;
-    if (is_compressed) {
-      std::string uncompress;
-      snappy::Uncompress(reinterpret_cast<char *>(buf.data()), frame_size,
-                         &uncompress);
-      std::memcpy(buf.data(), uncompress.data(), uncompress.size());
-      frame_size = uncompress.size();
-      command = (command & ~64);
-    }
-    assert(EDemoCommands_IsValid(command));
-    // std::cout << "Command: " << command << " Tick: " << tick
-    //           << " Frame Size: " << frame_size << " Compressed? "
-    //           << is_compressed << std::endl;
-    switch (command) {
-    case EDemoCommands::DEM_FileHeader: {
-      CDemoFileHeader header;
-      std::cout << header.GetTypeName() << std::endl;
-      header.ParseFromArray(buf.data(), frame_size);
-      header.PrintDebugString();
-      break;
-    }
-    case EDemoCommands::DEM_SignonPacket:
-    case EDemoCommands::DEM_Packet: {
-      CDemoPacket packet;
-      // std::cout << packet.GetTypeName() << std::endl;
-      packet.ParseFromArray(buf.data(), frame_size);
-      auto data = packet.data();
-      handle_packet(data);
-      break;
-    }
-    case EDemoCommands::DEM_SendTables: {
-      CDemoSendTables table;
-      table.ParseFromArray(buf.data(), frame_size);
-      std::cout << table.GetTypeName() << std::endl;
-      // table.PrintDebugString();
-    }
-    case EDemoCommands::DEM_StringTables: {
-      CDemoStringTables st;
-      st.ParseFromArray(buf.data(), frame_size);
-      // std::cout << st.GetTypeName() << std::endl;
-      // st.PrintDebugString();
-      break;
-    }
-    case EDemoCommands::DEM_ClassInfo: {
-      CDemoClassInfo class_info;
-      class_info.ParseFromArray(buf.data(), frame_size);
-      // std::cout << class_info.GetTypeName() << std::endl;
-      // class_info.PrintDebugString();
-      break;
-    }
-    default: {
-      std::cout << "Unknown Kind" << std::endl;
-      break;
-    }
-    }
-    kind_map[command] += 1;
-  }
-  for (auto it = kind_map.cbegin(); it != kind_map.cend(); ++it) {
-    std::cout << "Kind: " << it->first << " Count: " << it->second << "\n";
-  }
+  Demo *demo = new Demo(*input, file_info.st_size);
+  std::cout << demo->get_total_len() << std::endl;
+  std::cout << demo->get_frame(2) << std::endl;
+  // while (input->BytesUntilTotalBytesLimit() != 0) {
+  //   input->ReadVarint32(&command);
+  //   input->ReadVarint32(&tick);
+  //   input->ReadVarint32(&frame_size);
+  //   if (!input->ReadRaw(buf.data(), frame_size)) {
+  //     std::cerr << "error reading to buffer" << std::endl;
+  //     exit(EXIT_FAILURE);
+  //   }
+  //   bool is_compressed = (command & EDemoCommands::DEM_IsCompressed) ==
+  //                        EDemoCommands::DEM_IsCompressed;
+  //   // std::cout << tick << std::endl;
+  //   if (UINT32_MAX == tick)
+  //     tick = 0;
+  //   uint8_t *curr_buf = buf.data();
+  //   if (is_compressed) {
+  //     size_t uncompressed_size;
+  //     const char *char_buf = reinterpret_cast<const char *>(buf.data());
+  //     snappy::GetUncompressedLength(char_buf, frame_size, &uncompressed_size);
+  //     snappy::RawUncompress(char_buf, frame_size, uncompress);
+  //     curr_buf = reinterpret_cast<unsigned char *>(uncompress);
+  //     frame_size = uncompressed_size;
+  //     command = (command & ~64);
+  //   }
+  //   assert(EDemoCommands_IsValid(command));
+  //   if (tick % 3 != 0) { not3++; 
+  //     std::cout << "Command: " << command << " Tick: " << tick
+  //       << " Frame Size: " << frame_size << " Compressed? "
+  //       << is_compressed << std::endl;
+  //   }
+  //   // assert(tick % 3 == 0);
+  //   switch (command) {
+  //   case EDemoCommands::DEM_FileHeader: {
+  //     CDemoFileHeader header;
+  //     // std::cout << header.GetTypeName() << std::endl;
+  //     header.ParseFromArray(curr_buf, frame_size);
+  //     // header.PrintDebugString();
+  //     break;
+  //   }
+  //   case EDemoCommands::DEM_SignonPacket:
+  //   case EDemoCommands::DEM_Packet: {
+  //     CDemoPacket packet;
+  //     // std::cout << packet.GetTypeName() << std::endl;
+  //     packet.ParseFromArray(curr_buf, frame_size);
+  //     auto data = packet.data();
+  //     // handle_packet(data);
+  //     break;
+  //   }
+  //   case EDemoCommands::DEM_SendTables: {
+  //     CDemoSendTables table;
+  //     table.ParseFromArray(curr_buf, frame_size);
+  //     // std::cout << table.GetTypeName() << std::endl;
+  //     // table.PrintDebugString();
+  //   }
+  //   case EDemoCommands::DEM_StringTables: {
+  //     CDemoStringTables st;
+  //     st.ParseFromArray(curr_buf, frame_size);
+  //     // std::cout << st.GetTypeName() << std::endl;
+  //     // st.PrintDebugString();
+  //     break;
+  //   }
+  //   case EDemoCommands::DEM_ClassInfo: {
+  //     CDemoClassInfo class_info;
+  //     class_info.ParseFromArray(curr_buf, frame_size);
+  //     // std::cout << class_info.GetTypeName() << std::endl;
+  //     // class_info.PrintDebugString();
+  //     break;
+  //   }
+  //   default: {
+  //     // std::cout << "Unknown Kind" << std::endl;
+  //     break;
+  //   }
+  //   }
+  //   kind_map[command] += 1;
+  // }
+  // for (auto it = kind_map.cbegin(); it != kind_map.cend(); ++it) {
+    // std::cout << "Kind: " << it->first << " Count: " << it->second << "\n";
+  // }
   // for (auto it = ubit_map.cbegin(); it != ubit_map.cend(); ++it) {
   //   std::cout << "Ubit: " << it->first << " Count: " << it->second << "\n";
   // }

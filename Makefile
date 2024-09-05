@@ -9,6 +9,8 @@ LDFLAGS = -L/usr/lib  -lprotobuf  -labsl_log_internal_check_op -labsl_log_intern
 
 # Source files
 SRCS = main.cpp \
+       Demo.cpp\
+       \
        $(wildcard gen/*.pb.cc)
 
 # Object files
