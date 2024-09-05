@@ -18,13 +18,9 @@ public:
     this->byte_pos = 0;
     this->bit_pos = 0;
   }
-  // TODO: get rid of exception >:(
   uint64_t read_n_bits(int n) {
     uint64_t res = 0;
     for (int i = 0; i < n; i += 1) {
-      if (this->out_of_bounds()) {
-        throw std::out_of_range("");
-      }
       if ((this->bit_pos) >= 8) {
         this->byte_pos++;
         this->bit_pos = 0;
@@ -75,6 +71,10 @@ public:
       str.push_back(b);
     }
     return str;
+  }
+
+  uint64_t bits_remaining() {
+    return (bytes_len * 8) - (byte_pos * 8) - bit_pos;
   }
 
   bool out_of_bounds() { return this->byte_pos >= this->bytes_len; }
