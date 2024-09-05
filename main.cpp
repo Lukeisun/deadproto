@@ -136,6 +136,14 @@ int main(void) {
   Demo *demo = new Demo(*input, file_info.st_size);
   std::cout << demo->get_total_len() << std::endl;
   std::cout << demo->get_frame(2) << std::endl;
+  CDemoFileHeader packet;
+  packet.ParseFromArray(demo->get_frame(0).get_buffer().data(), demo->get_frame(0).get_frame_size());
+  packet.PrintDebugString();
+std::unordered_map<std::string, int> kind_map;
+  for(int i = 0; i < demo->get_total_len(); i++) {
+    auto c = demo->get_frame(i);
+    kind_map[c.get_command_str()]++;
+  }
   // while (input->BytesUntilTotalBytesLimit() != 0) {
   //   input->ReadVarint32(&command);
   //   input->ReadVarint32(&tick);
@@ -210,9 +218,9 @@ int main(void) {
   //   }
   //   kind_map[command] += 1;
   // }
-  // for (auto it = kind_map.cbegin(); it != kind_map.cend(); ++it) {
-    // std::cout << "Kind: " << it->first << " Count: " << it->second << "\n";
-  // }
+  for (auto it = kind_map.cbegin(); it != kind_map.cend(); ++it) {
+    std::cout << "Kind: " << it->first << " Count: " << it->second << "\n";
+  }
   // for (auto it = ubit_map.cbegin(); it != ubit_map.cend(); ++it) {
   //   std::cout << "Ubit: " << it->first << " Count: " << it->second << "\n";
   // }

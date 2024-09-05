@@ -46,10 +46,10 @@ Frame Demo::get_frame(size_t idx) {
   return Frame(this->commands[idx], this->ticks[idx], this->frame_sizes[idx],
                buffers[idx]);
 }
-uint32_t Frame::get_command() { return this->command; }
-std::string Frame::get_command_str() {
+uint32_t Frame::get_command() const { return this->command; }
+std::string Frame::get_command_str() const {
   return EDemoCommands_Name(this->command);
 }
-uint32_t Frame::get_tick() { return this->tick; }
-uint32_t Frame::get_frame_size() { return this->frame_size; };
-std::vector<uint8_t> Frame::get_buffer() { return this->buffer; };
+uint32_t Frame::get_tick() const { return this->tick; }
+uint32_t Frame::get_frame_size() const { return this->frame_size; };
+std::vector<uint8_t> Frame::get_buffer() const { return this->buffer; };
