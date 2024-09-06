@@ -30,6 +30,7 @@ Demo::Demo(google::protobuf::io::CodedInputStream &input, int limit) {
       command = (command & ~64);
     }
     assert(EDemoCommands_IsValid(command));
+    if (tick == UINT32_MAX) tick = 0;
     this->commands.emplace_back(command);
     this->ticks.emplace_back(tick);
     this->frame_sizes.emplace_back(frame_size);
