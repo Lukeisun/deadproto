@@ -21,6 +21,7 @@ public:
   uint64_t read_ubit();
   bool read_boolean();
   std::vector<uint8_t> read(int n);
+  std::vector<uint8_t> read_bits(int n);
   std::string read_string();
 
   uint64_t bits_remaining();

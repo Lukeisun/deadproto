@@ -1,4 +1,5 @@
 #include "Bits.hpp"
+#include <cmath>
 #include <cstdlib>
 Bits::Bits(char *bytes, size_t bytes_len) {
   this->bytes_len = bytes_len;
@@ -52,13 +53,18 @@ bool Bits::read_boolean() { return this->read_n_bits(1) == 1; }
 
 std::vector<uint8_t> Bits::read(int n) {
   std::vector<uint8_t> data(n);
-  // std::cout << "test" << +this->bit_pos << std::endl;
-  // if (this->bit_pos != 0) {
-  //   // this->bit_pos = 0;
-  //   // this->byte_pos++;
-  // }
   for (int i = 0; i < n; i++) {
     data[i] = static_cast<uint8_t>(this->read_n_bits(8));
+  }
+  return data;
+}
+std::vector<uint8_t> Bits::read_bits(int n) {
+  std::vector<uint8_t> data(ceil(n/8.0));
+  int temp = n;
+  for (int i = 0; i < ceil(n/8.0); i++) {
+    auto bit_size = (temp % 8 == 0) ? 8 : (temp%8);
+    data[i] = static_cast<uint8_t>(this->read_n_bits(bit_size));
+    temp -= bit_size;
   }
   return data;
 }

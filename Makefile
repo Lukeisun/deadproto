@@ -3,7 +3,7 @@ CXX = g++
 
 # Compiler flags
 # -fsanitize=address
-CXXFLAGS = -std=c++17 -I./proto  
+CXXFLAGS = -g -std=c++17 -I./proto  
 # Linker flags
 LDFLAGS = -L/usr/lib  -lprotobuf  -labsl_log_internal_check_op -labsl_log_internal_message -lsnappy
 

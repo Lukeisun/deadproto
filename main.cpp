@@ -3,6 +3,7 @@
 #include "gen/citadel_usermessages.pb.h"
 #include "gen/demo.pb.h"
 #include "gen/netmessages.pb.h"
+#include "gen/networkbasetypes.pb.h"
 #include "snappy.h"
 #include <cstdint>
 #include <cstdlib>
@@ -21,105 +22,104 @@
 #include <sys/types.h>
 #include <unordered_map>
 #include <vector>
-#define FILENAME "test_demo.dem"
-// #define FILENAME "demo.dem"
+// #define FILENAME "test_demo.dem"
+#define FILENAME "demo.dem"
 using namespace google::protobuf::io;
 std::unordered_map<int, int> ubit_map;
+class Entry {
+public:
+  int index;
+  std::string table_name;
+  std::string key;
+  std::vector<uint8_t> value;
+  Entry(std::string table_name, int index, std::string key,
+        std::vector<uint8_t> value)
+      : index(index), table_name(table_name), key(key), value(value){};
+};
+std::unordered_map<uint32_t, Entry> st_entries;
 
 void parse_string_table(CSVCMsg_CreateStringTable &table) {
   std::cout << table.GetTypeName() << std::endl;
-
-  if (table.name() == "userinfo") {
-    table.PrintDebugString();
-    auto _data = table.string_data();
-    std::string data;
-    std::cout << table.data_compressed() << std::endl;
-    if (table.data_compressed()) {
-      snappy::Uncompress(_data.data(), _data.size(), &data);
-    } else {
-      data = _data;
-    }
+  if (table.name() == "genericprecache")
+    return;
+  // if (table.name() != "userinfo")
+  //   return;
+  table.PrintDebugString();
+  auto _data = table.string_data();
+  std::string data;
+  if (table.data_compressed()) {
+    snappy::Uncompress(_data.data(), _data.size(), &data);
     assert(data.size() == table.uncompressed_size());
-    Bits *bits = new Bits(data.data(), data.size());
-    std::vector<std::string> keys{};
-    int index = -1;
-    if (bits->bits_remaining() == 0)
-      return;
-    for (auto i = 0; i < table.num_entries(); i++) {
-      std::string key = "";
-      // Increment index
-      if (bits->read_boolean()) {
-        index++;
-      } else {
-        index = bits->readVarInt32() + 1;
-      }
-      std::cout << "Index: " << index << std::endl;
-      // Has key?
-      if (bits->read_boolean()) {
-        std::cout << "KEY" << std::endl;
-        // Look at history?
-        if (bits->read_boolean()) {
-          std::cout << "HAS HISTORY" << std::endl;
-          auto pos = bits->read_n_bits(5);
-          auto len = bits->read_n_bits(5);
-          if (pos >= keys.size()) {
-            key += bits->read_string();
-            // std::cout << "Key1: " << key << std::endl;
-          } else {
-            auto s = keys[pos];
-            auto parsed_string = bits->read_string();
-            // std::cout << s;
-            if (len > s.length()) {
-              key += s + parsed_string;
-            } else {
-              // key += (s.substr(0, len)) + st_bits->read_string();
-              key += parsed_string;
-            }
-          }
-        } else {
-          key = bits->read_string();
-        }
-      } else {
-        // need a map of prev keys?
-        key = "placeholder";
-      }
-      if (std::find(keys.begin(), keys.end(), key) != keys.end()) {
-        keys.emplace_back(key);
-      }
-      if (key != "placeholder") {
-        std::cout << "Key: " << key << std::endl;
-      }
-      // std::vector
-      // Has value?
-      if (bits->read_boolean()) {
-        uint64_t bit_size = 0;
-        bool is_compressed = false;
-        if (table.user_data_fixed_size()) {
-          bit_size = table.user_data_size();
-        } else {
-          if ((table.flags() & 0x1) != 0) {
-            is_compressed = bits->read_boolean();
-            std::cout << "moar compress? " << is_compressed << std::endl;
-          }
-          if (table.using_varint_bitcounts()) {
-            auto ubit = bits->read_ubit();
-            std::cout << "ubit: " << ubit << std::endl;
-            bit_size = ubit;
-          } else {
-            bit_size = bits->read_n_bits(17);
-          }
-        }
-        std::cout << "bit size: " << bit_size << std::endl;
-        auto value = bits->read(bit_size);
-        std::cout << "Value: ";
-        for (auto c : value) {
-          std::cout << c;
-        }
-        std::cout << std::endl;
-      }
-      std::cout << bits->bits_remaining() << std::endl;
+  } else {
+    data = _data;
+  }
+  Bits *bits = new Bits(data.data(), data.size());
+  std::vector<std::string> keys{};
+  int index = -1;
+  if (bits->bits_remaining() == 0)
+    return;
+  for (auto i = 0; i < table.num_entries(); i++) {
+    std::string key = "";
+    // Increment index
+    if (bits->read_boolean()) {
+      index++;
+    } else {
+      index = bits->readVarInt32() + 1;
     }
-    delete bits;
+    // Has key?
+    if (bits->read_boolean()) {
+      // Look at history?
+      if (bits->read_boolean()) {
+        auto pos = bits->read_n_bits(5);
+        auto len = bits->read_n_bits(5);
+        if (pos >= keys.size()) {
+          key += bits->read_string();
+        } else {
+          auto s = keys[pos];
+          auto parsed_string = bits->read_string();
+          if (len > s.length()) {
+            key += s + parsed_string;
+          } else {
+            key += (s.substr(0, len)) + parsed_string;
+          }
+        }
+      } else {
+        key = bits->read_string();
+      }
+    } else {
+      // need a map of prev keys?
+      auto entry = st_entries.at(index);
+      key = entry.key;
+    }
+    if (std::find(keys.begin(), keys.end(), key) != keys.end()) {
+      keys.emplace_back(key);
+    }
+    std::cout << "Key: " << key << std::endl;
+    // Has value?
+    if (bits->read_boolean()) {
+      std::cout << "HAS VALUE" << std::endl;
+      uint64_t bit_size = 0;
+      bool is_compressed = false;
+      if (table.user_data_fixed_size()) {
+        bit_size = table.user_data_size_bits();
+      } else {
+        if ((table.flags() & 0x1) != 0) {
+          is_compressed = bits->read_boolean();
+        }
+        std::cout << "compressed?" << is_compressed << std::endl;
+        if (table.using_varint_bitcounts()) {
+          auto ubit = bits->read_ubit();
+          bit_size = ubit * 8;
+        } else {
+          bit_size = bits->read_n_bits(17) * 8;
+        }
+      }
+      std::cout << "bitsize " << bit_size << std::endl;
+      auto value = bits->read_bits(bit_size);
+      auto st_entry = Entry(table.name(), index, key, value);
+      st_entries.insert({index, st_entry});
+    }
+    // delete bits;
   }
 }
 void handle_packet(std::string data) {
@@ -150,6 +150,13 @@ void handle_packet(std::string data) {
       CSVCMsg_CreateStringTable table;
       table.ParseFromArray(buf.data(), size);
       parse_string_table(table);
+      break;
+    }
+    case svc_UpdateStringTable: {
+      CSVCMsg_UpdateStringTable table;
+      table.ParseFromArray(buf.data(), size);
+      // table.PrintDebugString();
+      // parse_string_table(table);
       break;
     }
     case k_EUserMsg_ChatMsg: {
@@ -251,10 +258,6 @@ int main(void) {
   for (auto it = kind_map.cbegin(); it != kind_map.cend(); ++it) {
     std::cout << "Kind: " << it->first << " Count: " << it->second << "\n";
   }
-  char t[] = {0x0A, 0x0B, 0x0C, 0x0D};
-  auto test = new Bits(t, 4);
-  auto x = test->read_n_bits(32);
-  std::cout << x << std::endl;
   for (auto it = ubit_map.cbegin(); it != ubit_map.cend(); ++it) {
     std::cout << "Ubit: " << it->first << " Count: " << it->second << "\n";
   }
