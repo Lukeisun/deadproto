@@ -40,8 +40,9 @@ std::unordered_map<uint32_t, Entry> st_entries;
 
 void parse_string_table(CSVCMsg_CreateStringTable &table) {
   std::cout << table.GetTypeName() << std::endl;
-  if (table.name() == "genericprecache")
-    return;
+  // if (table.name() != "EntityNames") return;
+  // if (table.name() == "genericprecache")
+  //   return;
   // if (table.name() != "userinfo")
   //   return;
   table.PrintDebugString();
@@ -72,15 +73,18 @@ void parse_string_table(CSVCMsg_CreateStringTable &table) {
       if (bits->read_boolean()) {
         auto pos = bits->read_n_bits(5);
         auto len = bits->read_n_bits(5);
+        auto parsed_string = bits->read_string();
+        std::cout << " PARSED STRING " << parsed_string << std::endl;
         if (pos >= keys.size()) {
-          key += bits->read_string();
+          key += parsed_string;
         } else {
           auto s = keys[pos];
-          auto parsed_string = bits->read_string();
           if (len > s.length()) {
             key += s + parsed_string;
           } else {
-            key += (s.substr(0, len)) + parsed_string;
+            std::cout << "s: " << s << " substr: " << s.substr(0, len)
+                      << std::endl;
+            key += (s.substr(0, len + 1)) + parsed_string;
           }
         }
       } else {
@@ -96,6 +100,7 @@ void parse_string_table(CSVCMsg_CreateStringTable &table) {
     }
     std::cout << "Key: " << key << std::endl;
     // Has value?
+    std::vector<uint8_t> value;
     if (bits->read_boolean()) {
       std::cout << "HAS VALUE" << std::endl;
       uint64_t bit_size = 0;
@@ -115,10 +120,15 @@ void parse_string_table(CSVCMsg_CreateStringTable &table) {
         }
       }
       std::cout << "bitsize " << bit_size << std::endl;
-      auto value = bits->read_bits(bit_size);
-      auto st_entry = Entry(table.name(), index, key, value);
-      st_entries.insert({index, st_entry});
+      value = bits->read_bits(bit_size);
     }
+    std::cout << "Value: ";
+    for (auto c : value) {
+      std::cout << c;
+    }
+    std::cout << std::endl;
+    auto st_entry = Entry(table.name(), index, key, value);
+    st_entries.insert({index, st_entry});
     // delete bits;
   }
 }

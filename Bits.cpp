@@ -72,7 +72,6 @@ std::string Bits::read_string() {
   std::string str;
   for (int i = 0; i < this->MAX_STR_LEN; i++) {
     const char b = static_cast<char>(this->read_n_bits(8));
-    // std::cout << "t: " << +b << std::endl;
     if (b == 0)
       break;
     str.push_back(b);
